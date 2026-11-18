@@ -138,6 +138,110 @@ app.get("/api/quotes", requireDb, async (req, res) => {
     }
 });
 
+// GET: Return a single contact record by id
+app.get("/api/contacts/:id", requireDb, async (req, res) => {
+    try {
+        const contact = await Contact.findById(req.params.id);
+        if (!contact) {
+            return res.status(404).json({ message: "Contact not found" });
+        }
+        res.status(200).json(contact);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Invalid contact id" });
+    }
+});
+
+// PUT: Update a contact record by id
+app.put("/api/contacts/:id", requireDb, async (req, res) => {
+    try {
+        const { name, email, phone, subject, message, budget, timeline } = req.body;
+
+        const updated = await Contact.findByIdAndUpdate(
+            req.params.id,
+            { name, email, phone, subject, message, budget, timeline },
+            { new: true, runValidators: true }
+        );
+
+        if (!updated) {
+            return res.status(404).json({ message: "Contact not found" });
+        }
+
+        res.status(200).json({ message: "Contact updated successfully ✅", contact: updated });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Error updating contact" });
+    }
+});
+
+// DELETE: Remove a contact record by id
+app.delete("/api/contacts/:id", requireDb, async (req, res) => {
+    try {
+        const deleted = await Contact.findByIdAndDelete(req.params.id);
+
+        if (!deleted) {
+            return res.status(404).json({ message: "Contact not found" });
+        }
+
+        res.status(200).json({ message: "Contact deleted successfully 🗑️" });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Invalid contact id" });
+    }
+});
+
+// GET: Return a single quote request by id
+app.get("/api/quotes/:id", requireDb, async (req, res) => {
+    try {
+        const quote = await Quote.findById(req.params.id);
+        if (!quote) {
+            return res.status(404).json({ message: "Quote request not found" });
+        }
+        res.status(200).json(quote);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Invalid quote id" });
+    }
+});
+
+// PUT: Update a quote request by id
+app.put("/api/quotes/:id", requireDb, async (req, res) => {
+    try {
+        const { name, email, phone, service, budget, description } = req.body;
+
+        const updated = await Quote.findByIdAndUpdate(
+            req.params.id,
+            { name, email, phone, service, budget, description },
+            { new: true, runValidators: true }
+        );
+
+        if (!updated) {
+            return res.status(404).json({ message: "Quote request not found" });
+        }
+
+        res.status(200).json({ message: "Quote request updated successfully ✅", quote: updated });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Error updating quote request" });
+    }
+});
+
+// DELETE: Remove a quote request by id
+app.delete("/api/quotes/:id", requireDb, async (req, res) => {
+    try {
+        const deleted = await Quote.findByIdAndDelete(req.params.id);
+
+        if (!deleted) {
+            return res.status(404).json({ message: "Quote request not found" });
+        }
+
+        res.status(200).json({ message: "Quote request deleted successfully 🗑️" });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Invalid quote id" });
+    }
+});
+
 // Health check (open /health in a browser to see if the server + DB are up)
 app.get("/health", (req, res) => {
     res.json({ server: "ok", database: mongoose.connection.readyState === 1 ? "connected" : "disconnected" });
