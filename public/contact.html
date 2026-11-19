@@ -64,9 +64,10 @@
 
                     <form id="contactForm" class="contact-form">
                         <div class="form-row">
-                            <div class="form-group">
+                            <div class="form-group" data-field="name">
                                 <label for="name">Full Name <span class="required">*</span></label>
-                                <input type="text" id="name" name="name" required>
+                                <input type="text" id="name" name="name" pattern="[A-Za-z\s'-]+" title="Letters only, please - no numbers or symbols." required>
+                                <small class="field-error"></small>
                             </div>
                             <div class="form-group">
                                 <label for="email">Email Address <span class="required">*</span></label>
@@ -382,9 +383,44 @@
       // Form submission (CONNECTED TO BACKEND)
 const contactForm = document.getElementById('contactForm');
 
+// Letters, spaces, hyphens and apostrophes only - no digits or symbols.
+const NAME_RE = /^[A-Za-z\s'-]+$/;
+
+function setFieldState(fieldName, isValid, errorText) {
+    const group = document.querySelector(`[data-field="${fieldName}"]`);
+    if (!group) return;
+    const errorEl = group.querySelector('.field-error');
+    group.classList.toggle('valid', isValid);
+    group.classList.toggle('invalid', !isValid);
+    if (errorEl) errorEl.textContent = isValid ? '' : errorText;
+}
+
+function validateNameField() {
+    const name = document.getElementById("name").value.trim();
+    if (!name) {
+        setFieldState('name', false, 'Full name is required.');
+        return false;
+    }
+    if (!NAME_RE.test(name)) {
+        setFieldState('name', false, 'Letters only, please - no numbers or symbols.');
+        return false;
+    }
+    setFieldState('name', true);
+    return true;
+}
+
+const nameInput = document.getElementById("name");
+if (nameInput) {
+    nameInput.addEventListener('input', validateNameField);
+}
+
 if (contactForm) {
     contactForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        if (!validateNameField()) {
+            return;
+        }
 
         const data = {
             name: document.getElementById("name").value,

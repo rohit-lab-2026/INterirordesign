@@ -77,6 +77,9 @@ app.post(["/contact", "/api/contact"], requireDb, async (req, res) => {
         if (!name || !email || !message) {
             return res.status(400).json({ message: "Name, email and message are required." });
         }
+        if (!NAME_RE.test(String(name).trim())) {
+            return res.status(400).json({ message: "Name must contain letters only (no numbers or symbols)." });
+        }
 
         const newContact = new Contact({
             name,
@@ -126,6 +129,8 @@ const User = mongoose.model("User", userSchema);
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Letters, spaces, hyphens and apostrophes only - no digits or symbols.
+const NAME_RE = /^[A-Za-z\s'-]+$/;
 
 // ─── Email (OTP verification) via Brevo's transactional email REST API ────
 // Uses HTTPS (port 443) rather than SMTP, since Render's free tier blocks
@@ -193,6 +198,7 @@ async function issueOtp(req, email, purpose) {
 function validateRegisterInput({ name, email, password }) {
     const errors = [];
     if (!name || name.trim().length < 2) errors.push("Name must be at least 2 characters.");
+    else if (!NAME_RE.test(name.trim())) errors.push("Name must contain letters only (no numbers or symbols).");
     if (!email || !EMAIL_RE.test(email)) errors.push("A valid email address is required.");
     if (!password || password.length < 6) errors.push("Password must be at least 6 characters.");
     return errors;
@@ -490,6 +496,9 @@ app.post("/api/quote", requireDb, async (req, res) => {
 
         if (!name || !email) {
             return res.status(400).json({ message: "Name and email are required." });
+        }
+        if (!NAME_RE.test(String(name).trim())) {
+            return res.status(400).json({ message: "Name must contain letters only (no numbers or symbols)." });
         }
 
         await new Quote({ name, email, phone, service, budget, description }).save();

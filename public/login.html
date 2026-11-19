@@ -180,7 +180,7 @@
 
                 <div class="form-group" data-field="name">
                     <label for="signup-name">Full Name <span class="required">*</span></label>
-                    <input type="text" id="signup-name" name="name" required>
+                    <input type="text" id="signup-name" name="name" pattern="[A-Za-z\s'-]+" title="Letters only, please - no numbers or symbols." required>
                     <small class="field-error"></small>
                 </div>
 
@@ -379,6 +379,8 @@
         // Validation helpers
         // ------------------------------------------------------------------
         const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        // Letters, spaces, hyphens and apostrophes only - no digits or symbols.
+        const NAME_RE = /^[A-Za-z\s'-]+$/;
 
         function setFieldState(form, fieldName, isValid, errorText) {
             const group = form.querySelector(`[data-field="${fieldName}"]`);
@@ -421,6 +423,9 @@
 
             if (name.length < 2) {
                 setFieldState(form, 'name', false, 'Name must be at least 2 characters.');
+                ok = false;
+            } else if (!NAME_RE.test(name)) {
+                setFieldState(form, 'name', false, 'Letters only, please - no numbers or symbols.');
                 ok = false;
             } else {
                 setFieldState(form, 'name', true);
