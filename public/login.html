@@ -469,8 +469,8 @@
                 const result = await response.json().catch(() => ({}));
 
                 if (response.ok && result.requiresOtp) {
-                    showBanner(result.message || 'Please verify your email to continue.', 'success');
                     showOtpStep(email);
+                    showBanner(result.message || 'Please verify your email to continue.', 'success');
                 } else if (response.ok) {
                     localStorage.setItem('nd_token', result.token);
                     localStorage.setItem('nd_user', JSON.stringify(result.user));
@@ -502,8 +502,8 @@
                 const result = await response.json().catch(() => ({}));
 
                 if (response.ok && result.requiresOtp) {
-                    showBanner(result.message || `We sent a verification code to ${email}.`, 'success');
                     showOtpStep(email);
+                    showBanner(result.message || `We sent a verification code to ${email}.`, 'success');
                 } else if (response.ok) {
                     localStorage.setItem('nd_token', result.token);
                     localStorage.setItem('nd_user', JSON.stringify(result.user));
