@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="auth-nav.js" defer></script>
 </head>
 <body>
     <!-- Top Bar -->
@@ -25,7 +26,7 @@
             <a href="portfolio.html">Portfolio</a>
             <a href="contact.html">Contact</a>
         </div>
-        <a href="contact.html" class="cta-outline">Request a Quote</a>
+        <a href="contact.html" class="cta-outline auth-only" id="nav-quote-desktop">Request a Quote</a>
           <a href="login.html" class="nav-account" title="Sign In" aria-label="Sign In"><i class="fas fa-user"></i></a>
         <button class="hamburger" id="hamburger">☰</button>
     </nav>
@@ -37,7 +38,7 @@
         <a href="services.html">Services</a>
         <a href="portfolio.html">Portfolio</a>
         <a href="contact.html">Contact</a>
-        <a href="contact.html" class="mt">Request a Quote</a>
+        <a href="contact.html" class="auth-only mt" id="nav-quote-mobile">Request a Quote</a>
         <a href="login.html">Sign In</a>
     </div>
 
