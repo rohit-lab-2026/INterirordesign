@@ -129,6 +129,26 @@ background: rgba(255,255,255,0.15);
 transform: translateY(-2px);
 box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
+/* NAV ACCOUNT / SIGN IN ICON */
+.nav-account {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+width: 38px;
+height: 38px;
+border-radius: 50%;
+border: 1px solid var(--white);
+color: var(--white);
+text-decoration: none;
+font-size: 15px;
+transition: var(--transition);
+}
+.nav-account:hover {
+background: rgba(255,255,255,0.15);
+transform: translateY(-2px);
+color: var(--yellow);
+box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
 /* HAMBURGER */
 .hamburger {
 display: none;
@@ -1536,12 +1556,15 @@ color: black;
 body.light .logo span {
 color: #D4A300;
 }
-body.light .cta-outline {
+body.light .cta-outline,
+body.light .nav-account {
 border-color: black;
 color: black;
 }
-body.light .cta-outline:hover {
+body.light .cta-outline:hover,
+body.light .nav-account:hover {
 background: rgba(0,0,0,0.05);
+color: #D4A300;
 }
 body.light .hero,
 body.light .hero::before {

@@ -85,6 +85,26 @@
             margin-top: 18px;
             color: #777;
         }
+        /* The site's shared .form-group rules are styled for the dark
+           contact-page panel (white text, translucent white borders/background).
+           This card is a light panel, so override with explicit light-theme
+           colors to keep the fields visible here regardless of load order. */
+        .auth-card .form-group label {
+            color: #444;
+        }
+        .auth-card .form-group input {
+            background-color: #fff;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        .auth-card .form-group input::placeholder {
+            color: #aaa;
+        }
+        .auth-card .form-group input:focus {
+            outline: none;
+            border-color: var(--yellow);
+            box-shadow: 0 0 0 3px rgba(245, 197, 38, 0.25);
+        }
     </style>
 </head>
 <body>
