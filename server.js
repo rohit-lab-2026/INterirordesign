@@ -4,12 +4,25 @@ const mongoose = require("mongoose");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const session = require("express-session");
 
 const app = express();
+
+// Render (and most hosts) terminate HTTPS in front of the app; trust the
+// proxy so secure cookies work correctly.
+app.set("trust proxy", 1);
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Holds the pending OTP for the visitor currently verifying their email,
+// used by the register/login/verify-otp routes below.
+app.use(session({
+    secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || "fallback-secret-key",
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: "auto", sameSite: "lax", maxAge: 10 * 60 * 1000 }
+}));
 
 // Serve static files (your HTML, CSS, JS)
 app.use(express.static("public"));
@@ -105,6 +118,7 @@ const userSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
+    verified: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -112,6 +126,68 @@ const User = mongoose.model("User", userSchema);
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// ─── Email (OTP verification) via Brevo's transactional email REST API ────
+// Uses HTTPS (port 443) rather than SMTP, since Render's free tier blocks
+// outbound SMTP ports. Requires BREVO_API_KEY and MAIL_FROM_EMAIL (a sender
+// verified in your Brevo account) to be set as environment variables.
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const MAIL_FROM_EMAIL = process.env.MAIL_FROM_EMAIL;
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || "Nordic Designs";
+
+async function sendMail({ to, subject, html }) {
+    if (!BREVO_API_KEY || !MAIL_FROM_EMAIL) {
+        throw new Error("BREVO_API_KEY and MAIL_FROM_EMAIL must be set.");
+    }
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+            accept: "application/json"
+        },
+        body: JSON.stringify({
+            sender: { name: MAIL_FROM_NAME, email: MAIL_FROM_EMAIL },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html
+        }),
+        signal: AbortSignal.timeout(15000)
+    });
+    if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(`Brevo responded ${response.status}: ${detail}`);
+    }
+}
+
+if (BREVO_API_KEY && MAIL_FROM_EMAIL) {
+    console.log("[mail] Brevo configured, sending as", MAIL_FROM_EMAIL);
+} else {
+    console.error("[mail] not configured: set BREVO_API_KEY and MAIL_FROM_EMAIL");
+}
+
+// Generates a 6-digit OTP, remembers it in the visitor's session, and emails
+// it. Shared by register (new account verification) and login (resend for
+// a not-yet-verified account).
+async function issueOtp(req, email, purpose) {
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    req.session.otp = otp;
+    req.session.otpEmail = email.toLowerCase();
+    req.session.otpPurpose = purpose || "verify";
+    req.session.otpExpiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    const subject = "Verify your Nordic Designs email";
+    const html = `
+      <div style="font-family: sans-serif; max-width: 420px; margin: auto;">
+        <h2>${subject}</h2>
+        <p style="font-size: 28px; font-weight: bold; letter-spacing: 6px;">${otp}</p>
+        <p style="color:#666; font-size: 13px;">This code expires in 10 minutes.</p>
+      </div>
+    `;
+
+    await sendMail({ to: email, subject, html });
+    return { message: "OTP sent." };
+}
 
 // Server-side validation, mirrors the client-side checks in login.html
 function validateRegisterInput({ name, email, password }) {
@@ -180,36 +256,50 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-// Route: Register a new account
+// Route: Register a new account. Account is created unverified; a 6-digit
+// OTP is emailed via Brevo, and no JWT is issued until /api/auth/verify-otp
+// confirms it. If the account save fails, that's a genuine "could not
+// create the account" error. If the account saves but the OTP email fails,
+// the account is rolled back (deleted) instead of being left as an
+// unverified, unrecoverable account that would block future signups with
+// "already exists" while never being able to receive its code.
 app.post("/api/auth/register", requireDb, async (req, res) => {
-    try {
-        const { name, email, password } = req.body || {};
-        const errors = validateRegisterInput({ name, email, password });
-        if (errors.length) {
-            return res.status(400).json({ message: errors[0], errors });
-        }
+    const { name, email, password } = req.body || {};
+    const errors = validateRegisterInput({ name, email, password });
+    if (errors.length) {
+        return res.status(400).json({ message: errors[0], errors });
+    }
 
-        const existing = await User.findOne({ email: email.toLowerCase() });
+    const key = email.toLowerCase();
+    let user;
+    try {
+        const existing = await User.findOne({ email: key });
         if (existing) {
             return res.status(409).json({ message: "An account with this email already exists." });
         }
-
         const passwordHash = await bcrypt.hash(password, 10);
-        const user = await User.create({ name, email: email.toLowerCase(), passwordHash });
-
-        const token = jwt.sign({ id: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: "7d" });
-        res.status(201).json({
-            message: "Account created successfully 🎉",
-            token,
-            user: { id: user._id, name: user.name, email: user.email, createdAt: user.createdAt }
-        });
+        user = await User.create({ name, email: key, passwordHash, verified: false });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Error creating account" });
+        console.error("[register] could not save account:", err.message);
+        return res.status(500).json({ message: "Could not create the account." });
+    }
+
+    try {
+        const result = await issueOtp(req, key, "verify");
+        res.status(201).json({ message: result.message || `We sent a verification code to ${key}.`, requiresOtp: true });
+    } catch (err) {
+        console.error("[register] account created but OTP email failed, rolling back:", err.message);
+        await User.deleteOne({ _id: user._id }).catch((cleanupErr) => {
+            console.error("[register] rollback delete failed:", cleanupErr.message);
+        });
+        res.status(502).json({
+            message: "We could not send the verification email. Please check the mail configuration and try again."
+        });
     }
 });
 
-// Route: Log in with email + password
+// Route: Log in with email + password. Unverified accounts are blocked and
+// sent a fresh OTP instead of a token, so they finish verifying first.
 app.post("/api/auth/login", requireDb, async (req, res) => {
     try {
         const { email, password } = req.body || {};
@@ -227,6 +317,21 @@ app.post("/api/auth/login", requireDb, async (req, res) => {
             return res.status(401).json({ message: "Invalid email or password." });
         }
 
+        if (!user.verified) {
+            try {
+                const result = await issueOtp(req, user.email, "verify");
+                return res.status(200).json({
+                    message: result.message || "Please verify your email before signing in. We sent a new code.",
+                    requiresOtp: true
+                });
+            } catch (otpErr) {
+                console.error("[login] credentials ok but OTP email failed:", otpErr.message);
+                return res.status(502).json({
+                    message: "Your password is correct, but your account is still unverified and we could not send a new code. Please try again shortly."
+                });
+            }
+        }
+
         const token = jwt.sign({ id: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: "7d" });
         res.status(200).json({
             message: "Login successful ✅",
@@ -236,6 +341,62 @@ app.post("/api/auth/login", requireDb, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Login failed" });
+    }
+});
+
+// Route: (Re)send an OTP without logging in — used by the "Resend code" link.
+app.post("/api/auth/send-otp", async (req, res) => {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ message: "email is required." });
+    try {
+        const result = await issueOtp(req, email, "verify");
+        res.status(200).json(result);
+    } catch (err) {
+        console.error("[send-otp] failed:", err.message);
+        res.status(502).json({ message: "Failed to send email." });
+    }
+});
+
+// Route: Confirm the code the visitor typed against the one stored in their
+// session. On success, marks the account verified and returns a JWT so the
+// frontend can log them straight in.
+app.post("/api/auth/verify-otp", requireDb, async (req, res) => {
+    const { email, otp } = req.body || {};
+    if (!email || !otp) {
+        return res.status(400).json({ message: "email and otp are required." });
+    }
+    if (!req.session.otp) {
+        return res.status(400).json({ message: "No code was requested." });
+    }
+    if (Date.now() > req.session.otpExpiresAt) {
+        return res.status(400).json({ message: "Code expired. Request a new one." });
+    }
+    if (req.session.otpEmail !== email.toLowerCase() || req.session.otp !== otp) {
+        return res.status(400).json({ message: "Incorrect code." });
+    }
+
+    delete req.session.otp;
+    delete req.session.otpEmail;
+    delete req.session.otpExpiresAt;
+
+    try {
+        const user = await User.findOneAndUpdate(
+            { email: email.toLowerCase() },
+            { verified: true },
+            { new: true }
+        );
+        if (!user) {
+            return res.status(404).json({ message: "Account not found." });
+        }
+        const token = jwt.sign({ id: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+        res.status(200).json({
+            message: "Email verified 🎉",
+            token,
+            user: { id: user._id, name: user.name, email: user.email, createdAt: user.createdAt }
+        });
+    } catch (err) {
+        console.error("[verify-otp] could not mark user verified:", err.message);
+        res.status(500).json({ message: "Verified, but could not finish logging you in. Please sign in." });
     }
 });
 

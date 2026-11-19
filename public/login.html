@@ -209,6 +209,26 @@
 
                 <p class="auth-switch">Already have an account? <a href="#" data-switch="signin">Sign in</a></p>
             </form>
+
+            <!-- OTP verification form (shown after register, or after sign-in
+                 attempt on an unverified account) -->
+            <form id="otp-form" class="auth-form" novalidate>
+                <h2 class="auth-title">Check your email</h2>
+                <p class="auth-subtitle">Enter the 6-digit code we sent to <strong id="otp-email-display"></strong>.</p>
+
+                <div class="form-group" data-field="otp">
+                    <label for="otp-code">Verification Code <span class="required">*</span></label>
+                    <input type="text" id="otp-code" name="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
+                    <small class="field-error"></small>
+                </div>
+
+                <button type="submit" class="cta-solid full-width">
+                    <span>Verify &amp; Continue</span>
+                    <i class="fas fa-check"></i>
+                </button>
+
+                <p class="auth-switch">Didn't get it? <a href="#" id="otp-resend">Resend code</a></p>
+            </form>
         </div>
     </section>
 
@@ -315,16 +335,31 @@
         // Tab switching between Sign In / Create Account
         // ------------------------------------------------------------------
         const tabs = document.querySelectorAll('.auth-tab');
+        const authTabsEl = document.querySelector('.auth-tabs');
         const forms = {
             signin: document.getElementById('signin-form'),
             signup: document.getElementById('signup-form'),
+            otp: document.getElementById('otp-form'),
         };
         const banner = document.getElementById('auth-banner');
+        const otpEmailDisplay = document.getElementById('otp-email-display');
+        let pendingOtpEmail = '';
 
         function switchTab(name) {
             tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
             Object.entries(forms).forEach(([key, form]) => form.classList.toggle('active', key === name));
+            // The OTP step isn't one of the Sign In / Create Account tabs,
+            // so hide the tab switcher while it's showing.
+            authTabsEl.style.display = name === 'otp' ? 'none' : '';
             banner.classList.remove('show', 'success', 'error');
+        }
+
+        // Shows the OTP step for the given email (after register, or after a
+        // sign-in attempt on an account that isn't verified yet).
+        function showOtpStep(email) {
+            pendingOtpEmail = email;
+            otpEmailDisplay.textContent = email;
+            switchTab('otp');
         }
 
         tabs.forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
@@ -433,7 +468,10 @@
                 });
                 const result = await response.json().catch(() => ({}));
 
-                if (response.ok) {
+                if (response.ok && result.requiresOtp) {
+                    showBanner(result.message || 'Please verify your email to continue.', 'success');
+                    showOtpStep(email);
+                } else if (response.ok) {
                     localStorage.setItem('nd_token', result.token);
                     localStorage.setItem('nd_user', JSON.stringify(result.user));
                     showBanner(result.message || 'Signed in successfully!', 'success');
@@ -463,7 +501,10 @@
                 });
                 const result = await response.json().catch(() => ({}));
 
-                if (response.ok) {
+                if (response.ok && result.requiresOtp) {
+                    showBanner(result.message || `We sent a verification code to ${email}.`, 'success');
+                    showOtpStep(email);
+                } else if (response.ok) {
                     localStorage.setItem('nd_token', result.token);
                     localStorage.setItem('nd_user', JSON.stringify(result.user));
                     showBanner(result.message || 'Account created!', 'success');
@@ -471,6 +512,54 @@
                 } else {
                     showBanner(result.message || `Could not create the account (${response.status}).`, 'error');
                 }
+            } catch (err) {
+                console.error(err);
+                showBanner('Could not reach the server. Please try again.', 'error');
+            }
+        });
+
+        forms.otp.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const otp = forms.otp.otp.value.trim();
+            if (!/^\d{6}$/.test(otp)) {
+                setFieldState(forms.otp, 'otp', false, 'Enter the 6-digit code.');
+                return;
+            }
+            setFieldState(forms.otp, 'otp', true);
+
+            try {
+                const response = await fetch('/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: pendingOtpEmail, otp }),
+                });
+                const result = await response.json().catch(() => ({}));
+
+                if (response.ok) {
+                    localStorage.setItem('nd_token', result.token);
+                    localStorage.setItem('nd_user', JSON.stringify(result.user));
+                    showBanner(result.message || 'Verified!', 'success');
+                    setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+                } else {
+                    showBanner(result.message || `Verification failed (${response.status}).`, 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showBanner('Could not reach the server. Please try again.', 'error');
+            }
+        });
+
+        document.getElementById('otp-resend').addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!pendingOtpEmail) return;
+            try {
+                const response = await fetch('/api/auth/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: pendingOtpEmail }),
+                });
+                const result = await response.json().catch(() => ({}));
+                showBanner(response.ok ? (result.message || 'A new code was sent.') : (result.message || 'Could not resend the code.'), response.ok ? 'success' : 'error');
             } catch (err) {
                 console.error(err);
                 showBanner('Could not reach the server. Please try again.', 'error');
