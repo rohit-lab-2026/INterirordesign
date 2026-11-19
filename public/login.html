@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Nordic Designs</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Page-specific styles, scoped to this page only */
+        .auth-section {
+            min-height: 70vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 24px 100px;
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 460px;
+            background: var(--panel-bg);
+            color: var(--gray-dark);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            padding: 44px 40px;
+        }
+        .auth-tabs {
+            display: flex;
+            gap: 8px;
+            background: var(--gray-light);
+            border-radius: 12px;
+            padding: 6px;
+            margin-bottom: 28px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px 0;
+            border: none;
+            background: transparent;
+            border-radius: 9px;
+            font-family: var(--font-body);
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--gray-dark);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .auth-tab.active {
+            background: var(--yellow);
+            color: #1a1a1a;
+        }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+        .auth-title {
+            font-family: var(--font-heading);
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+        .auth-subtitle {
+            font-size: 14px;
+            color: #777;
+            margin-bottom: 24px;
+        }
+        .field-error {
+            display: none;
+            color: #F44336;
+            font-size: 12.5px;
+            margin-top: 6px;
+        }
+        .form-group.invalid .field-error { display: block; }
+        .auth-banner {
+            display: none;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 18px;
+        }
+        .auth-banner.show { display: block; }
+        .auth-banner.success { background: #e7f6e8; color: #2e7d32; }
+        .auth-banner.error { background: #fdecea; color: #c62828; }
+        .auth-switch {
+            text-align: center;
+            font-size: 13.5px;
+            margin-top: 18px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <span>📍 Stockholm, Sweden | 📞 +92 315 146 7374</span>
+        <span>Featured in Architectural Digest</span>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <a href="index.html" class="logo">Nordic<span>Designs</span></a>
+        <div class="menu">
+            <a href="index.html">Home</a>
+            <a href="about.html">About</a>
+            <a href="services.html">Services</a>
+            <a href="portfolio.html">Portfolio</a>
+            <a href="contact.html">Contact</a>
+        </div>
+        <a href="login.html" class="cta-outline">Sign In</a>
+        <button class="hamburger" id="hamburger">☰</button>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobile-menu">
+        <a href="index.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="services.html">Services</a>
+        <a href="portfolio.html">Portfolio</a>
+        <a href="contact.html">Contact</a>
+        <a href="login.html" class="mt">Sign In</a>
+    </div>
+
+    <!-- Auth Section -->
+    <section class="auth-section">
+        <div class="auth-card">
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" data-tab="signin">Sign In</button>
+                <button type="button" class="auth-tab" data-tab="signup">Create Account</button>
+            </div>
+
+            <div id="auth-banner" class="auth-banner"></div>
+
+            <!-- Sign In form -->
+            <form id="signin-form" class="auth-form active" novalidate>
+                <h2 class="auth-title">Welcome back</h2>
+                <p class="auth-subtitle">Sign in to manage your consultations and quotes.</p>
+
+                <div class="form-group" data-field="email">
+                    <label for="signin-email">Email Address <span class="required">*</span></label>
+                    <input type="email" id="signin-email" name="email" required>
+                    <small class="field-error"></small>
+                </div>
+
+                <div class="form-group" data-field="password">
+                    <label for="signin-password">Password <span class="required">*</span></label>
+                    <input type="password" id="signin-password" name="password" required>
+                    <small class="field-error"></small>
+                </div>
+
+                <button type="submit" class="cta-solid full-width">
+                    <span>Sign In</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+
+                <p class="auth-switch">Don't have an account? <a href="#" data-switch="signup">Create one</a></p>
+            </form>
+
+            <!-- Create Account form -->
+            <form id="signup-form" class="auth-form" novalidate>
+                <h2 class="auth-title">Create your account</h2>
+                <p class="auth-subtitle">Join us to track your project requests in one place.</p>
+
+                <div class="form-group" data-field="name">
+                    <label for="signup-name">Full Name <span class="required">*</span></label>
+                    <input type="text" id="signup-name" name="name" required>
+                    <small class="field-error"></small>
+                </div>
+
+                <div class="form-group" data-field="email">
+                    <label for="signup-email">Email Address <span class="required">*</span></label>
+                    <input type="email" id="signup-email" name="email" required>
+                    <small class="field-error"></small>
+                </div>
+
+                <div class="form-group" data-field="password">
+                    <label for="signup-password">Password <span class="required">*</span></label>
+                    <input type="password" id="signup-password" name="password" required>
+                    <small class="field-error"></small>
+                </div>
+
+                <div class="form-group" data-field="confirmPassword">
+                    <label for="signup-confirm">Confirm Password <span class="required">*</span></label>
+                    <input type="password" id="signup-confirm" name="confirmPassword" required>
+                    <small class="field-error"></small>
+                </div>
+
+                <button type="submit" class="cta-solid full-width">
+                    <span>Create Account</span>
+                    <i class="fas fa-user-plus"></i>
+                </button>
+
+                <p class="auth-switch">Already have an account? <a href="#" data-switch="signin">Sign in</a></p>
+            </form>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-col brand">
+                <h3 class="footer-logo">Nordic<span>Designs</span></h3>
+                <p>
+                    Award-winning interior design studio specializing in Scandinavian-inspired spaces that blend beauty, functionality, and sustainability.
+                </p>
+            </div>
+
+            <div class="footer-col">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="about.html">About Us</a></li>
+                    <li><a href="services.html">Services</a></li>
+                    <li><a href="portfolio.html">Portfolio</a></li>
+                    <li><a href="contact.html">Contact</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-col">
+                <h4>Services</h4>
+                <ul>
+                    <li>Residential Design</li>
+                    <li>Commercial Spaces</li>
+                    <li>Design Consultation</li>
+                    <li>Renovation &amp; Remodeling</li>
+                    <li>Custom Furniture</li>
+                </ul>
+            </div>
+
+            <div class="footer-col contact">
+                <h4>Contact Us</h4>
+                <div class="contact-item">
+                    <span class="icon">📍</span>
+                    <p>Stockholm, Sweden</p>
+                </div>
+                <div class="contact-item">
+                    <span class="icon">📞</span>
+                    <p>+92 315 146 7374</p>
+                </div>
+                <div class="contact-item">
+                    <span class="icon">✉️</span>
+                    <p>hello@nordicdesigns.com</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            © 2026 Nordic Designs. All rights reserved. Designed with ❤️ in Stockholm
+        </div>
+    </footer>
+
+    <!-- Theme Toggle -->
+    <button id="theme-toggle" class="theme-btn">🌙</button>
+
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function () {
+            const nav = document.querySelector('.nav');
+            if (window.scrollY > 50) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        });
+
+        // Mobile menu toggle
+        const hamburger = document.getElementById('hamburger');
+        const mobileMenu = document.getElementById('mobile-menu');
+        hamburger.addEventListener('click', () => {
+            mobileMenu.classList.toggle('show');
+        });
+        document.querySelectorAll('.mobile-menu a').forEach(link => {
+            link.addEventListener('click', () => mobileMenu.classList.remove('show'));
+        });
+
+        // Theme toggle with memory
+        const themeToggle = document.getElementById('theme-toggle');
+        const savedTheme = localStorage.getItem("theme");
+        if (savedTheme === "light") {
+            document.body.classList.add("light");
+            themeToggle.textContent = "🌞";
+        } else {
+            document.body.classList.remove("light");
+            themeToggle.textContent = "🌙";
+        }
+        themeToggle.addEventListener("click", () => {
+            document.body.classList.toggle("light");
+            if (document.body.classList.contains("light")) {
+                localStorage.setItem("theme", "light");
+                themeToggle.textContent = "🌞";
+            } else {
+                localStorage.setItem("theme", "dark");
+                themeToggle.textContent = "🌙";
+            }
+        });
+
+        // ------------------------------------------------------------------
+        // Tab switching between Sign In / Create Account
+        // ------------------------------------------------------------------
+        const tabs = document.querySelectorAll('.auth-tab');
+        const forms = {
+            signin: document.getElementById('signin-form'),
+            signup: document.getElementById('signup-form'),
+        };
+        const banner = document.getElementById('auth-banner');
+
+        function switchTab(name) {
+            tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+            Object.entries(forms).forEach(([key, form]) => form.classList.toggle('active', key === name));
+            banner.classList.remove('show', 'success', 'error');
+        }
+
+        tabs.forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
+        document.querySelectorAll('[data-switch]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchTab(link.dataset.switch);
+            });
+        });
+
+        function showBanner(message, type) {
+            banner.textContent = message;
+            banner.className = 'auth-banner show ' + type;
+        }
+
+        // ------------------------------------------------------------------
+        // Validation helpers
+        // ------------------------------------------------------------------
+        const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        function setFieldState(form, fieldName, isValid, errorText) {
+            const group = form.querySelector(`[data-field="${fieldName}"]`);
+            const errorEl = group.querySelector('.field-error');
+            group.classList.toggle('valid', isValid);
+            group.classList.toggle('invalid', !isValid);
+            errorEl.textContent = isValid ? '' : errorText;
+        }
+
+        function validateSignIn() {
+            const form = forms.signin;
+            const email = form.email.value.trim();
+            const password = form.password.value;
+            let ok = true;
+
+            if (!EMAIL_RE.test(email)) {
+                setFieldState(form, 'email', false, 'Enter a valid email address.');
+                ok = false;
+            } else {
+                setFieldState(form, 'email', true);
+            }
+
+            if (!password) {
+                setFieldState(form, 'password', false, 'Password is required.');
+                ok = false;
+            } else {
+                setFieldState(form, 'password', true);
+            }
+
+            return ok;
+        }
+
+        function validateSignUp() {
+            const form = forms.signup;
+            const name = form.name.value.trim();
+            const email = form.email.value.trim();
+            const password = form.password.value;
+            const confirmPassword = form.confirmPassword.value;
+            let ok = true;
+
+            if (name.length < 2) {
+                setFieldState(form, 'name', false, 'Name must be at least 2 characters.');
+                ok = false;
+            } else {
+                setFieldState(form, 'name', true);
+            }
+
+            if (!EMAIL_RE.test(email)) {
+                setFieldState(form, 'email', false, 'Enter a valid email address.');
+                ok = false;
+            } else {
+                setFieldState(form, 'email', true);
+            }
+
+            if (password.length < 6) {
+                setFieldState(form, 'password', false, 'Password must be at least 6 characters.');
+                ok = false;
+            } else {
+                setFieldState(form, 'password', true);
+            }
+
+            if (confirmPassword !== password || !confirmPassword) {
+                setFieldState(form, 'confirmPassword', false, 'Passwords do not match.');
+                ok = false;
+            } else {
+                setFieldState(form, 'confirmPassword', true);
+            }
+
+            return ok;
+        }
+
+        // ------------------------------------------------------------------
+        // Submit handlers
+        // ------------------------------------------------------------------
+        forms.signin.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!validateSignIn()) return;
+
+            const email = forms.signin.email.value.trim();
+            const password = forms.signin.password.value;
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+                const result = await response.json().catch(() => ({}));
+
+                if (response.ok) {
+                    localStorage.setItem('nd_token', result.token);
+                    localStorage.setItem('nd_user', JSON.stringify(result.user));
+                    showBanner(result.message || 'Signed in successfully!', 'success');
+                    setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+                } else {
+                    showBanner(result.message || `Login failed (${response.status}).`, 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showBanner('Could not reach the server. Please try again.', 'error');
+            }
+        });
+
+        forms.signup.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!validateSignUp()) return;
+
+            const name = forms.signup.name.value.trim();
+            const email = forms.signup.email.value.trim();
+            const password = forms.signup.password.value;
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password }),
+                });
+                const result = await response.json().catch(() => ({}));
+
+                if (response.ok) {
+                    localStorage.setItem('nd_token', result.token);
+                    localStorage.setItem('nd_user', JSON.stringify(result.user));
+                    showBanner(result.message || 'Account created!', 'success');
+                    setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+                } else {
+                    showBanner(result.message || `Could not create the account (${response.status}).`, 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showBanner('Could not reach the server. Please try again.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

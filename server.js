@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const path = require("path");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 
@@ -97,6 +99,228 @@ const quoteSchema = new mongoose.Schema({
 });
 
 const Quote = mongoose.model("Quote", quoteSchema);
+
+// ─── User accounts (login / register) ──────────────────────────────────────
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    passwordHash: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model("User", userSchema);
+
+const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key";
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Server-side validation, mirrors the client-side checks in login.html
+function validateRegisterInput({ name, email, password }) {
+    const errors = [];
+    if (!name || name.trim().length < 2) errors.push("Name must be at least 2 characters.");
+    if (!email || !EMAIL_RE.test(email)) errors.push("A valid email address is required.");
+    if (!password || password.length < 6) errors.push("Password must be at least 6 characters.");
+    return errors;
+}
+
+// Verifies a Bearer JWT and attaches { id, email } to req.auth
+function requireAuth(req, res, next) {
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (!token) {
+        return res.status(401).json({ message: "Missing or invalid Authorization header." });
+    }
+    try {
+        req.auth = jwt.verify(token, JWT_SECRET); // { id, email, iat, exp }
+        next();
+    } catch (err) {
+        return res.status(401).json({ message: "Invalid or expired token. Please log in again." });
+    }
+}
+
+// Allows a request through if EITHER a valid x-admin-key header is present
+// (full access to any account), OR a valid Bearer token belonging to the
+// same user as req.params.id (self access only). This is what lets you test
+// "access a different account" in Postman via the admin key, while a normal
+// logged-in user's own token only ever works on their own record.
+function requireAdminOrSelf(req, res, next) {
+    const configuredKey = process.env.ADMIN_KEY;
+    const providedKey = req.headers["x-admin-key"];
+    if (configuredKey && providedKey === configuredKey) {
+        return next();
+    }
+
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (!token) {
+        return res.status(401).json({
+            message: "Provide a valid x-admin-key header, or a Bearer token for this account."
+        });
+    }
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.id !== req.params.id) {
+            return res.status(403).json({ message: "You can only access your own account." });
+        }
+        req.auth = decoded;
+        next();
+    } catch (err) {
+        return res.status(401).json({ message: "Invalid or expired token." });
+    }
+}
+
+// Admin-only: lists every registered account (never returns password hashes)
+function requireAdmin(req, res, next) {
+    const configuredKey = process.env.ADMIN_KEY;
+    if (!configuredKey) {
+        return res.status(503).json({ message: "Admin access is not configured on this server." });
+    }
+    if (req.headers["x-admin-key"] !== configuredKey) {
+        return res.status(403).json({ message: "Invalid admin key." });
+    }
+    next();
+}
+
+// Route: Register a new account
+app.post("/api/auth/register", requireDb, async (req, res) => {
+    try {
+        const { name, email, password } = req.body || {};
+        const errors = validateRegisterInput({ name, email, password });
+        if (errors.length) {
+            return res.status(400).json({ message: errors[0], errors });
+        }
+
+        const existing = await User.findOne({ email: email.toLowerCase() });
+        if (existing) {
+            return res.status(409).json({ message: "An account with this email already exists." });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+        const user = await User.create({ name, email: email.toLowerCase(), passwordHash });
+
+        const token = jwt.sign({ id: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+        res.status(201).json({
+            message: "Account created successfully 🎉",
+            token,
+            user: { id: user._id, name: user.name, email: user.email, createdAt: user.createdAt }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Error creating account" });
+    }
+});
+
+// Route: Log in with email + password
+app.post("/api/auth/login", requireDb, async (req, res) => {
+    try {
+        const { email, password } = req.body || {};
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password are required." });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(401).json({ message: "Invalid email or password." });
+        }
+
+        const matches = await bcrypt.compare(password, user.passwordHash);
+        if (!matches) {
+            return res.status(401).json({ message: "Invalid email or password." });
+        }
+
+        const token = jwt.sign({ id: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+        res.status(200).json({
+            message: "Login successful ✅",
+            token,
+            user: { id: user._id, name: user.name, email: user.email, createdAt: user.createdAt }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Login failed" });
+    }
+});
+
+// GET: Return every registered account (admin only, no password hashes)
+app.get("/api/users", requireAdmin, requireDb, async (req, res) => {
+    try {
+        const users = await User.find({}, { passwordHash: 0 }).sort({ createdAt: -1 });
+        res.status(200).json(users);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Error fetching users" });
+    }
+});
+
+// GET: Return a single user by id (admin key, or that user's own token)
+app.get("/api/users/:id", requireAdminOrSelf, requireDb, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id, { passwordHash: 0 });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.status(200).json(user);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Invalid user id" });
+    }
+});
+
+// PUT: Update a user's name/email/password (admin key, or that user's own token)
+app.put("/api/users/:id", requireAdminOrSelf, requireDb, async (req, res) => {
+    try {
+        const { name, email, password } = req.body || {};
+        const update = {};
+
+        if (name !== undefined) {
+            if (name.trim().length < 2) {
+                return res.status(400).json({ message: "Name must be at least 2 characters." });
+            }
+            update.name = name;
+        }
+        if (email !== undefined) {
+            if (!EMAIL_RE.test(email)) {
+                return res.status(400).json({ message: "A valid email address is required." });
+            }
+            update.email = email.toLowerCase();
+        }
+        if (password !== undefined) {
+            if (password.length < 6) {
+                return res.status(400).json({ message: "Password must be at least 6 characters." });
+            }
+            update.passwordHash = await bcrypt.hash(password, 10);
+        }
+
+        const updated = await User.findByIdAndUpdate(req.params.id, update, {
+            new: true,
+            runValidators: true
+        }).select("-passwordHash");
+
+        if (!updated) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({ message: "User updated successfully ✅", user: updated });
+    } catch (err) {
+        console.error(err);
+        if (err.code === 11000) {
+            return res.status(409).json({ message: "That email is already in use." });
+        }
+        res.status(400).json({ message: "Error updating user" });
+    }
+});
+
+// DELETE: Remove a user account (admin key, or that user's own token)
+app.delete("/api/users/:id", requireAdminOrSelf, requireDb, async (req, res) => {
+    try {
+        const deleted = await User.findByIdAndDelete(req.params.id);
+        if (!deleted) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.status(200).json({ message: "User deleted successfully 🗑️" });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Invalid user id" });
+    }
+});
 
 // Route: Handle quote requests
 app.post("/api/quote", requireDb, async (req, res) => {
