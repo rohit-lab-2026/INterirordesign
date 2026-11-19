@@ -129,9 +129,12 @@ background: rgba(255,255,255,0.15);
 transform: translateY(-2px);
 box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
-/* Hidden until the visitor is signed in (see auth-gated-nav.js) */
+/* Hidden until the visitor is signed in (see auth-nav.js).
+   !important because the stylesheet has multiple later .cta-outline
+   rules that set display explicitly and would otherwise win on
+   source order despite equal specificity. */
 .auth-only {
-display: none;
+display: none !important;
 }
 /* NAV ACCOUNT / SIGN IN ICON */
 .nav-account {
