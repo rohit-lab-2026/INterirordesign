@@ -511,9 +511,16 @@ app.post("/api/quote", requireDb, async (req, res) => {
 });
 
 // GET: Return all contact form records (requires database connection)
+// Optional ?email=... filters to records matching that email (case-insensitive).
+// An email isn't a unique key on this collection - the same person can submit
+// the form more than once - so this returns an array, not a single record.
 app.get("/api/contacts", requireDb, async (req, res) => {
     try {
-        const contacts = await Contact.find().sort({ createdAt: -1 });
+        const filter = {};
+        if (req.query.email) {
+            filter.email = new RegExp(`^${String(req.query.email).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+        }
+        const contacts = await Contact.find(filter).sort({ createdAt: -1 });
         res.status(200).json(contacts);
     } catch (err) {
         console.error(err);
@@ -521,10 +528,15 @@ app.get("/api/contacts", requireDb, async (req, res) => {
     }
 });
 
-// GET: Return all quote request records (requires database connection)
+// GET: Return all quote request records (requires database connection).
+// Same optional ?email=... filter as /api/contacts, same reasoning.
 app.get("/api/quotes", requireDb, async (req, res) => {
     try {
-        const quotes = await Quote.find().sort({ createdAt: -1 });
+        const filter = {};
+        if (req.query.email) {
+            filter.email = new RegExp(`^${String(req.query.email).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+        }
+        const quotes = await Quote.find(filter).sort({ createdAt: -1 });
         res.status(200).json(quotes);
     } catch (err) {
         console.error(err);
