@@ -596,6 +596,25 @@ app.delete("/api/contacts/:id", requireDb, async (req, res) => {
     }
 });
 
+// DELETE: Remove every contact record matching ?email=... (required - this
+// route refuses to run with no filter, so it can never wipe the whole
+// collection by accident). Since email isn't unique here, this can delete
+// more than one record; the response reports how many were removed.
+app.delete("/api/contacts", requireDb, async (req, res) => {
+    const email = req.query.email ? String(req.query.email).trim() : "";
+    if (!email) {
+        return res.status(400).json({ message: "A ?email=... query parameter is required." });
+    }
+    try {
+        const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const result = await Contact.deleteMany({ email: new RegExp(`^${escaped}$`, "i") });
+        res.status(200).json({ message: `Deleted ${result.deletedCount} contact record(s) for ${email}.`, deletedCount: result.deletedCount });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Error deleting contacts" });
+    }
+});
+
 // GET: Return a single quote request by id
 app.get("/api/quotes/:id", requireDb, async (req, res) => {
     try {
@@ -645,6 +664,23 @@ app.delete("/api/quotes/:id", requireDb, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(400).json({ message: "Invalid quote id" });
+    }
+});
+
+// DELETE: Remove every quote record matching ?email=... (required - see the
+// matching /api/contacts route for why).
+app.delete("/api/quotes", requireDb, async (req, res) => {
+    const email = req.query.email ? String(req.query.email).trim() : "";
+    if (!email) {
+        return res.status(400).json({ message: "A ?email=... query parameter is required." });
+    }
+    try {
+        const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const result = await Quote.deleteMany({ email: new RegExp(`^${escaped}$`, "i") });
+        res.status(200).json({ message: `Deleted ${result.deletedCount} quote record(s) for ${email}.`, deletedCount: result.deletedCount });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Error deleting quote requests" });
     }
 });
 
